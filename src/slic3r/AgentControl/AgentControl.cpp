@@ -315,7 +315,8 @@ Controller::Json Controller::execute(const Commands::Work& work)
         else if (devices_commands().count(work.method)) result = execute_devices(context, work.method, params);
         else result = execute_printing(context, work.method, params);
         if (!result.is_null()) {
-            if (domain->second.mutating && !printing_commands().count(work.method))
+            if (domain->second.mutating && !printing_commands().count(work.method) &&
+                !(work.method == "plate.set_layer_pause" && result.value("changed", true) == false))
                 invalidate(scene_commands().count(work.method) != 0);
             result["state_token"] = state_token();
             if (work.method == "scene.describe") {

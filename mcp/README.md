@@ -94,12 +94,21 @@ Expanded tools group fixed allowlists of native actions:
 | `orca_preview` | Native PNG as MCP image content |
 | `orca_history` | Native history inspection, Undo/Redo |
 | `orca_slice_plates` | Explicit plate set with sequential child jobs |
+| `orca_list_layers` | Read sliced layers and pause markers for the selected plate |
+| `orca_set_layer_pause` | Add or remove a pause before a layer |
 | `orca_printers` | Printer/backend status, AMS slots, external spools and nozzle inventory |
 | `orca_printer_selection` | Explicit Device-tab selection with default nozzle synchronization |
 | `orca_printing` | Frozen plans, submit, reconcile, device controls |
 | `orca_recipes` | Local recipe discovery, checks, export and operation observation |
 | `orca_recipe_library` | Immutable revisions, forks, archive and planned import |
 | `orca_recipe_apply` | Composition plans and single native application |
+
+To set a layer pause, select and slice the plate, then call `orca_list_layers`.
+Pass its `slice_id` and current `state_token` to `orca_set_layer_pause` with a
+1-based layer number and `enabled: true` (or `false` to remove it). The change
+invalidates the slice: slice again before exporting or printing, and before
+changing another pause. The printer profile supplies the pause G-code. Sequential
+by-object printing is unsupported for these markers.
 
 1. Choose the complete session/window UUID pair according to the user's project
    intent. Ask if ambiguous; focus, port, PID and list order never select a target.

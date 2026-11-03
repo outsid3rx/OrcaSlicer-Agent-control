@@ -2,6 +2,15 @@
 
 [English](./verification.md) | [Русский](./verification.ru.md)
 
+## Layer pauses
+
+On 2026-11-02, the macOS arm64 Release build passed 87 MCP tests and five
+AgentControl CTest suites. An isolated real GUI/MCP session added a pause before
+layer 5, re-sliced, and verified its position in exported G-code. A 3MF project
+retained the marker after reopening; removing the pause and re-slicing produced
+G-code without it. No printer was contacted, so physical pause behavior remains
+unverified. This check did not establish Windows/Linux runtime or notarization.
+
 Verified 2026-10-25 on macOS arm64, Python 3.12.13 and MCP SDK 1.30.0.
 Adapter 0.4.0; OrcaSlicer 2.5.0-dev, wire v1 / API revision 3.
 

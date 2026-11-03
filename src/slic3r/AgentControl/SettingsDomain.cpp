@@ -18,6 +18,8 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
+#include "slic3r/GUI/GCodeViewer.hpp"
+#include "slic3r/GUI/IMSlider.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/BackgroundSlicingProcess.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
@@ -38,6 +40,7 @@
 #include <vector>
 #include <boost/beast/core/detail/base64.hpp>
 #include <igl/Hit.h>
+#include <wx/glcanvas.h>
 
 namespace Slic3r::AgentControl {
 namespace {
@@ -50,6 +53,84 @@ const std::set<std::string> legacy_keys {
 
 Json text() { return {{"type", "string"}, {"maxLength", 256}}; }
 Json bounded_integer(int maximum) { return {{"type", "integer"}, {"minimum", 0}, {"maximum", maximum}}; }
+
+Json layer_pauses(DomainContext& ctx, const std::string& method, const Json& params)
+{
+    auto& plate = resolve_plate(ctx, params);
+    ensure(&plate == ctx.plater.get_partplate_list().get_curr_plate(), "invalid_scope", "Select the requested plate before managing layer pauses");
+    ensure(!ctx.plater.background_process().running(), "busy", "Wait for slicing to complete");
+    auto* result = plate.get_slice_result();
+    ensure(result && plate.is_slice_result_valid() && !plate.is_apply_result_invalid(), "slice_unavailable", "A current completed slice is required");
+    auto* canvas = ctx.plater.get_preview_canvas3D();
+    ensure(canvas, "preview_unavailable", "The layer preview is unavailable");
+    auto& viewer = canvas->get_gcode_viewer();
+    ensure(viewer.loaded_result_id() == result->id, "preview_unavailable", "Open the current slice preview before managing layer pauses");
+    auto* slider = viewer.get_layers_slider();
+    ensure(slider, "preview_unavailable", "The layer slider is unavailable");
+    const auto zs = viewer.get_layers_zs();
+    ensure(!zs.empty(), "slice_unavailable", "The current slice has no layers");
+    ensure(slider->GetMaxValue() == int(zs.size() - 1) && std::abs(slider->GetMaxValueD() - zs.back()) < 0.00001,
+           "preview_unavailable", "Wait for the current layer slider to finish updating");
+    const auto& all_entries = ctx.plater.model().plates_custom_gcodes;
+    const auto existing = all_entries.find(plate.get_index());
+    auto entries = slider->GetTicksValues();
+    ensure(entries.gcodes.size() == (existing == all_entries.end() ? 0 : existing->second.gcodes.size()),
+           "preview_unavailable", "Layer events do not match the loaded slider; refresh the preview first");
+    auto match = [](double a, double b) { return std::abs(a - b) < 0.00001; };
+    if (existing != all_entries.end()) {
+        auto model_events = existing->second.gcodes;
+        auto slider_events = entries.gcodes;
+        std::sort(model_events.begin(), model_events.end());
+        std::sort(slider_events.begin(), slider_events.end());
+        for (size_t i = 0; i < model_events.size(); ++i) {
+            const auto& a = model_events[i];
+            const auto& b = slider_events[i];
+            ensure(match(a.print_z, b.print_z) && a.type == b.type && a.extruder == b.extruder && a.color == b.color && a.extra == b.extra,
+                   "preview_unavailable", "Layer events do not match the loaded slider; refresh the preview first");
+        }
+    }
+    if (method == "plate.list_layers") {
+        const size_t offset = params.value("offset", 0), limit = params.value("limit", 100);
+        Json layers = Json::array();
+        for (size_t i = offset; i < zs.size() && i - offset < limit; ++i) {
+            const bool paused = std::any_of(entries.gcodes.begin(), entries.gcodes.end(), [&](const auto& e) { return e.type == CustomGCode::PausePrint && match(e.print_z, zs[i]); });
+            layers.push_back({{"layer", i + 1}, {"z_mm", zs[i]}, {"pause", paused}});
+        }
+        return {{"plate_id", plate_identity(ctx, plate)}, {"slice_id", result->id}, {"layers", layers}, {"total", zs.size()}, {"offset", offset}, {"limit", limit}, {"has_more", offset < zs.size() && zs.size() - offset > limit}};
+    }
+    ensure(plate.get_real_print_seq() != PrintSequence::ByObject, "unsupported", "Layer pauses are unavailable for sequential printing");
+    ensure(params.at("slice_id") == result->id, "stale_slice", "The requested slice has changed; list layers again");
+    const auto layer = params.at("layer").get<size_t>();
+    ensure(layer >= 1 && layer <= zs.size(), "invalid_layer", "Layer number is outside the current slice");
+    const double z = zs[layer - 1];
+    const bool enabled = params.at("enabled").get<bool>();
+    if (enabled) {
+        const auto config = GUI::wxGetApp().preset_bundle->full_config();
+        ensure(!config.opt_string("machine_pause_gcode").empty(), "pause_unavailable", "The selected printer has no pause G-code configured");
+    }
+    auto it = std::find_if(entries.gcodes.begin(), entries.gcodes.end(), [&](const auto& e) { return match(e.print_z, z); });
+    ensure(it == entries.gcodes.end() || it->type == CustomGCode::PausePrint, "layer_conflict", "Another layer event already exists at this height");
+    const bool changed = enabled != (it != entries.gcodes.end());
+    if (changed) {
+        ensure(GUI::wxGetApp().is_editor() && !ctx.plater.only_gcode_mode(), "unsupported", "Layer pauses require an editable project");
+        const auto original = entries;
+        ctx.plater.take_snapshot(enabled ? "Add layer pause" : "Remove layer pause");
+        if (enabled) entries.gcodes.push_back({z, CustomGCode::PausePrint, 1, "", ""});
+        else entries.gcodes.erase(it);
+        std::sort(entries.gcodes.begin(), entries.gcodes.end());
+        slider->SetTicksValues(entries);
+        if (slider->GetTicksValues().gcodes != entries.gcodes) {
+            slider->SetTicksValues(original);
+            throw DomainError("layer_conflict", "The layer slider could not preserve all events");
+        }
+        // Use the same synchronous handler as a slider edit: it copies the
+        // slider state to the model, invalidates the slice and refreshes UI.
+        wxCommandEvent event(GUI::EVT_CUSTOMEVT_TICKSCHANGED);
+        event.SetInt(CustomGCode::PausePrint);
+        canvas->get_wxglcanvas()->ProcessWindowEvent(event);
+    }
+    return {{"plate_id", plate_identity(ctx, plate)}, {"layer", layer}, {"z_mm", z}, {"enabled", enabled}, {"changed", changed}, {"reslice_required", changed}};
+}
 Json page_properties()
 {
     return {{"offset", bounded_integer(1000000)}, {"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", 100}}},
@@ -772,6 +853,10 @@ Json painting(DomainContext& ctx, const std::string& method, const Json& params)
 CommandSpecs settings_commands()
 {
     CommandSpecs specs;
+    Json layers {{"plate_id", text()}, {"offset", bounded_integer(1000000)}, {"limit", {{"type", "integer"}, {"minimum", 1}, {"maximum", 100}}}};
+    specs["plate.list_layers"] = command_spec(false, layers, {"plate_id"});
+    Json pause {{"plate_id", text()}, {"layer", {{"type", "integer"}, {"minimum", 1}, {"maximum", 1000000}}}, {"slice_id", {{"type", "integer"}, {"minimum", 0}}}, {"enabled", {{"type", "boolean"}}}};
+    specs["plate.set_layer_pause"] = command_spec(true, pause, {"plate_id", "layer", "enabled", "slice_id"});
     Json query = owner_properties(); query.update(page_properties());
     specs["settings.describe"] = command_spec(false, query);
     specs["settings.get"] = command_spec(false, query);
@@ -818,6 +903,7 @@ CommandSpecs settings_commands()
 Json execute_settings(DomainContext& ctx, const std::string& method, const Json& params)
 {
     ensure(GUI::wxGetApp().preset_bundle != nullptr, "not_ready", "Preset bundle is not available");
+    if (method == "plate.list_layers" || method == "plate.set_layer_pause") return layer_pauses(ctx, method, params);
     if (method == "settings.describe") return describe_settings(params);
     if (method == "settings.get") return read_settings(ctx, params);
     if (method == "settings.patch") return patch_settings(ctx, params);

@@ -12,7 +12,7 @@ native method or code execution tool.
 
 ```text
 MCP stdio client
-  -> server.py: 28 tools, selectors, image conversion, outcome semantics
+  -> server.py: 30 tools, selectors, image conversion, outcome semantics
   -> client.py: private discovery, explicit target, HTTP RPC, bounded observation
   -> authenticated loopback native queue
   -> GUI controller and native scene/settings/geometry/printing domains

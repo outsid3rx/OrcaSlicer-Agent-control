@@ -19,6 +19,7 @@ The fork adds [`src/slic3r/AgentControl`](src/slic3r/AgentControl), which valida
 - Load and save models and projects, create plates, arrange and transform objects.
 - Change process, plate, object, part, and height-range settings, including supports, bridges, and ironing.
 - Use geometry and painting operations available in the current build, slice, and obtain real PNG previews of models and toolpaths.
+- Inspect sliced layers and add or remove pauses before a selected layer.
 - Select a printer, retrieve AMS/external spools, map used filaments to slots, and synchronize a supported single nozzle.
 - Maintain a local recipe library: settings with immutable revisions, compatibility checks, composition, and JSON import/export.
 - Prepare and submit print jobs under the owner's authorization rules, retaining an operation receipt.
@@ -29,7 +30,7 @@ Specific actions depend on the running build's capabilities, printer type, and t
 
 [`mcp/`](mcp) is the `orca-slicer-mcp` Python package, using the official MCP SDK and **stdio** transport. It works with any client supporting that transport, including Codex, Claude Desktop, Cursor, Windsurf, and ZCode. Configuration methods and skill support depend on the client. No separate HTTP MCP server is started: MCP connects to Orca's private authenticated loopback API.
 
-The server provides **28 tools**. The agent can inspect native schemas and the current build's capabilities; there is no arbitrary code execution tool. With multiple instances, the agent selects the full `session_id` / `window_id` pair, rather than the focused window or the first list item. Changes are tied to project state, and long operations return jobs that can be monitored.
+The server provides **30 tools**. The agent can inspect native schemas and the current build's capabilities; there is no arbitrary code execution tool. With multiple instances, the agent selects the full `session_id` / `window_id` pair, rather than the focused window or the first list item. Changes are tied to project state, and long operations return jobs that can be monitored.
 
 The recipe library is stored outside the application and checkout, at `~/Library/Application Support/orca-slicer-mcp/recipes.sqlite3` on macOS. Multiple MCP clients can use the same database. [MCP documentation](mcp/README.md) · [Recipe contract](mcp/docs/contracts/recipes-v1/CONTRACT.md).
 

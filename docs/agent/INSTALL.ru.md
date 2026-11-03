@@ -50,7 +50,7 @@ ORCA_AGENT_OUTPUT_ROOTS='["/Users/your-name/Exports"]' \
 
 ```sh
 ./scripts/agent/install.sh install \
-  --wheel /absolute/path/orca_slicer_mcp-0.4.0-py3-none-any.whl \
+  --wheel /absolute/path/orca_slicer_mcp-0.5.0-py3-none-any.whl \
   --client codex --client zcode
 ```
 

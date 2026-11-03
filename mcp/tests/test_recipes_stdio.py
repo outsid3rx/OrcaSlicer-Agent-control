@@ -265,7 +265,7 @@ class RecipeStdioIntegrationTests(unittest.IsolatedAsyncioTestCase):
         protected_values = copy.deepcopy(self.b.values)
         async with self.session() as session:
             catalog = {tool.name: tool for tool in (await session.list_tools()).tools}
-            self.assertEqual(len(catalog), 28)
+            self.assertEqual(len(catalog), 30)
             for name in ("orca_recipes", "orca_recipe_library", "orca_recipe_apply"):
                 self.assertFalse(catalog[name].annotations.openWorldHint)
                 self.assertNotIn("ctx", catalog[name].inputSchema["properties"])

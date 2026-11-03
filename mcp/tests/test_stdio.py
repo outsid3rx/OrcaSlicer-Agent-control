@@ -130,7 +130,7 @@ class StdioIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         initialized = await session.initialize()
                         self.assertEqual(initialized.serverInfo.name, "OrcaSlicer")
                         catalog = await session.list_tools()
-                        self.assertEqual(len(catalog.tools), 28)
+                        self.assertEqual(len(catalog.tools), 30)
                         for tool in catalog.tools:
                             self.assertNotIn("ctx", tool.inputSchema["properties"])
                         patch_tool = next(t for t in catalog.tools if t.name == "orca_patch_settings")
@@ -157,6 +157,18 @@ class StdioIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         await call("orca_get_capabilities", {"target": a.target})
                         await call("orca_get_settings_schema", {"target": a.target})
                         scene = await call("orca_get_scene", {"target": a.target})
+                        layers = await call("orca_list_layers", {"target": a.target, "plate_id": "plate:1:2"})
+                        self.assertEqual(layers["result"]["method"], "plate.list_layers")
+                        self.assertEqual(layers["result"]["parameters"]["plate_id"], "plate:1:2")
+                        pause_args = {"target": a.target, "plate_id": "plate:1:2", "layer": 3,
+                                      "enabled": True, "slice_id": 42, "state_token": a.state_token, "request_id": "pause-1"}
+                        pause = await call("orca_set_layer_pause", pause_args)
+                        self.assertEqual(pause["result"]["method"], "plate.set_layer_pause")
+                        self.assertEqual(pause["result"]["parameters"], {k: v for k, v in pause_args.items()
+                                                                         if k not in ("target", "request_id")})
+                        replay_pause = await call("orca_set_layer_pause", pause_args)
+                        self.assertEqual(replay_pause["job_id"], pause["job_id"])
+                        await call("orca_set_layer_pause", {**pause_args, "layer": 0}, error=True)
                         args = {"target": a.target, "scope": "object", "object_id": "97",
                             "state_token": scene["result"]["state_token"], "request_id": "edit-1",
                             "values": {"wall_loops": "4"}}

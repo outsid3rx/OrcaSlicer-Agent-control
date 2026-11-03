@@ -229,6 +229,33 @@ def create_server(directory: Path, recipes_db: Path | None = None) -> FastMCP:
         return tool_result(await ctx.request_context.lifespan_context.client.call(target, "slicing.result", {"job_id": job_id}, wait_seconds=wait_seconds))
 
     @server.tool(annotations=read)
+    async def orca_list_layers(target: Target, plate_id: ObjectId, ctx: Context,
+                               wait_seconds: WaitSeconds = 1,
+                               offset: Annotated[int, Field(ge=0, strict=True)] = 0,
+                               limit: Annotated[int, Field(ge=1, le=100, strict=True)] = 100) -> CallToolResult:
+        """Read layers and pause markers from the current sliced preview of the specified plate.
+
+        Layer numbers start at 1; each marker pauses before the indicated layer. Slice first.
+        """
+        return tool_result(await ctx.request_context.lifespan_context.client.call(target, "plate.list_layers",
+            {"plate_id": plate_id, "offset": offset, "limit": limit}, wait_seconds=wait_seconds))
+
+    @server.tool(annotations=mutate)
+    async def orca_set_layer_pause(target: Target, plate_id: ObjectId,
+                                   layer: Annotated[int, Field(ge=1, strict=True)], enabled: bool,
+                                   slice_id: Annotated[int, Field(ge=0, strict=True)],
+                                   state_token: StateToken, request_id: RequestId, ctx: Context,
+                                   wait_seconds: WaitSeconds = 1) -> CallToolResult:
+        """Add or remove a pause before a 1-based layer on the explicitly selected plate.
+
+        Inspect the current sliced layers and use their fresh state token. A change invalidates
+        the slice; slice again before export or printing. This tool does not start a print.
+        """
+        return tool_result(await ctx.request_context.lifespan_context.client.call(target, "plate.set_layer_pause",
+            {"plate_id": plate_id, "layer": layer, "enabled": enabled, "slice_id": slice_id, "state_token": state_token},
+            request_id=request_id, wait_seconds=wait_seconds))
+
+    @server.tool(annotations=read)
     async def orca_get_job(target: Target, job_id: JobId, ctx: Context, wait_seconds: WaitSeconds = 1) -> CallToolResult:
         """Observe the same job after a timeout. No new operation is submitted and no job is cancelled."""
         return tool_result(await ctx.request_context.lifespan_context.client.job(target, job_id, wait_seconds))

@@ -38,6 +38,8 @@ Unused materials in the project do not by themselves require deletion. Slicing d
 
 Slice the explicitly identified plate(s), wait for completion, and inspect the native result. For the required print report, render an actual completed toolpath/slice preview: use `orca_preview` with `preview.render` and `scope: slice` when the running schema advertises it. A `plate`/`scene` model thumbnail shows placement, not the slicing result; never label it a screenshot of the slice. Estimates and previews do not prove physical fit or successful printing.
 
+For a requested pause before a layer, select and slice the intended plate, then use `orca_list_layers` to obtain its 1-based layer numbers, heights, `slice_id`, and state token. Use `orca_set_layer_pause` with that slice and token; `enabled: false` removes a pause. Each change invalidates the slice: slice again before another pause change, export, or printing. The printer profile supplies the pause command. Sequential by-object printing is unsupported for these markers. Do not confuse these planned layer pauses with device-wide pause controls.
+
 ## Improve settings from print evidence
 
 For a print-quality problem or calibration request in a connected window, read
