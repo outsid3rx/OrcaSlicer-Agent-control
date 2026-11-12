@@ -1,9 +1,7 @@
-> Original documentation from [OrcaSlicer/OrcaSlicer](https://github.com/OrcaSlicer/OrcaSlicer). References to the official project below describe upstream, not this fork. Local image paths have been adjusted for this file location.
-
 <div align="center">
 
 <picture>
-  <img alt="OrcaSlicer logo" src="../../resources/images/OrcaSlicer.png" width="15%" height="15%">
+  <img alt="OrcaSlicer logo" src="resources/images/OrcaSlicer.png" width="15%" height="15%">
 </picture>
 
 <a href="https://trendshift.io/repositories/15552" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15552" alt="OrcaSlicer%2FOrcaSlicer | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
@@ -89,7 +87,7 @@ The [wiki](https://www.orcaslicer.com/wiki) aims to provide a detailed explanati
 
 📥 **[Download the Latest Stable Release](https://github.com/OrcaSlicer/OrcaSlicer/releases/latest)**  
 Visit our GitHub Releases page for the latest stable version of OrcaSlicer, recommended for most users.  
-Windows release binaries are code signed; see our [Code signing policy](#code-signing-policy).
+Windows and macOS release and nightly builds are code signed.
 
 ## Nightly Builds
 
@@ -147,9 +145,9 @@ winget install --id=SoftFever.OrcaSlicer -e
 
     - Option 3:
         - Step 1: open the app, a warning window will pop up  
-            ![mac_cant_open](../../SoftFever_doc/mac_cant_open.png)
+            ![mac_cant_open](./SoftFever_doc/mac_cant_open.png)
         - Step 2: in `System Settings` -> `Privacy & Security`, click `Open Anyway`:  
-            ![mac_security_setting](../../SoftFever_doc/mac_security_setting.png)
+            ![mac_security_setting](./SoftFever_doc/mac_security_setting.png)
     </details>
 
 ### Homebrew Cask
@@ -218,12 +216,12 @@ Thank you! :)
 <tr>
 <td>
 <a href="https://qidi3d.com/" style="display:inline-block; border-radius:8px; background:#fff;">
-  <img src="../../SoftFever_doc/sponsor_logos/QIDI.png" alt="QIDI" width="100" height="100">
+  <img src="SoftFever_doc\sponsor_logos\QIDI.png" alt="QIDI" width="100" height="100">
 </a>
 </td>
 <td>
 <a href="https://bigtree-tech.com/" style="display:inline-block; border-radius:8px; background:#222;">
-    <img src="../../SoftFever_doc/sponsor_logos/BigTreeTech.png" alt="BIGTREE TECH" width="100" height="100">
+    <img src="SoftFever_doc\sponsor_logos\BigTreeTech.png" alt="BIGTREE TECH" width="100" height="100">
 </a>
 </td>
 </tr>
@@ -246,16 +244,6 @@ Open-source slicing has always been built on a tradition of collaboration and at
 OrcaSlicer began in that same spirit, drawing from BambuStudio, PrusaSlicer, and ideas inspired by CuraSlicer and SuperSlicer. But it has since grown far beyond its origins. Through relentless innovation — introducing advanced calibration tools, precise wall and seam control, tree supports, adaptive slicing, and hundreds of other features — OrcaSlicer has become the most widely used and actively developed open-source slicer in the 3D printing community. Many of its innovations have been adopted by other slicers, making it a driving force for the entire industry.
 
 The OrcaSlicer logo was designed by community member [Justin Levine](https://github.com/jal-co).
-
-# Code Signing Policy
-
-Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
-
-Windows release binaries are built by GitHub Actions from this repository and signed through the SignPath Foundation program. Every signing request is manually approved.
-
-**Team roles:** [SoftFever](https://github.com/SoftFever) is the committer, reviewer and approver for all signed releases.
-
-**Privacy policy:** See the [OrcaSlicer privacy policy](https://www.orcaslicer.com/privacy-policy/).
 
 # License
 
