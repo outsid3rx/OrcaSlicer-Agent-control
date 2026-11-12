@@ -16,6 +16,7 @@
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/TriangleSelector.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/CreatePresetsDialog.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GCodeViewer.hpp"
@@ -545,10 +546,77 @@ PresetCollection& collection(Preset::Type type)
 Json preset_info(const Preset& preset)
 {
     return {{"name", preset.name}, {"system", preset.is_system}, {"compatible", preset.is_compatible},
-            {"visible", preset.is_visible}, {"dirty", preset.is_dirty}, {"inherits", preset.inherits()}};
+            {"visible", preset.is_visible}, {"dirty", preset.is_dirty}, {"inherits", preset.inherits()},
+            {"filament_id", preset.filament_id.empty() ? Json() : Json(preset.filament_id)},
+            {"setting_id", preset.setting_id.empty() ? Json() : Json(preset.setting_id)}};
 }
 Json presets(DomainContext& ctx, const std::string& method, const Json& params)
 {
+    if (method == "presets.create_filament") {
+        ensure(!ctx.plater.background_process().running(), "busy", "Wait for slicing to complete");
+        try {
+            auto created = GUI::create_agent_filament(params.at("vendor").get<std::string>(),
+                params.at("serial").get<std::string>(), params.at("template_name").get<std::string>());
+            return {{"name", created.name}, {"filament_id", created.filament_id}, {"printer", created.printer},
+                {"slot_assigned", false}, {"cloud_sync", "unverified"}};
+        } catch (const std::runtime_error& error) {
+            throw DomainError("filament_creation_failed", error.what());
+        }
+    }
+    if (method == "presets.filament_matches") {
+        const auto reported = params.value("ams_filament_id", std::string());
+        auto& bundle = *GUI::wxGetApp().preset_bundle;
+        Json slots = Json::array(), matches = Json::array();
+        for (size_t i = 0; i < bundle.filament_presets.size(); ++i) {
+            const auto& name = bundle.filament_presets[i];
+            const auto* selected = bundle.filaments.find_preset(name, false);
+            slots.push_back({{"filament_id", i + 1}, {"preset_name", name},
+                {"preset", selected ? preset_info(*selected) : Json()}});
+        }
+        if (!reported.empty()) {
+            for (const auto& preset : bundle.filaments.get_presets())
+                if (preset.filament_id == reported && preset.is_visible && preset.is_compatible)
+                    matches.push_back(preset_info(preset));
+        }
+        return {{"ams_filament_id", reported.empty() ? Json() : Json(reported)},
+            {"match_state", reported.empty() ? "unavailable" : matches.empty() ? "no_match" : matches.size() == 1 ? "unique" : "ambiguous"},
+            {"matches", matches}, {"project_filaments", slots},
+            {"note", "AMS ID must come from fresh device telemetry. A matching ID does not prove the loaded spool or downstream queue selection."}};
+    }
+    if (method == "presets.assign_filament") {
+        auto& bundle = *GUI::wxGetApp().preset_bundle;
+        const auto id = params.at("filament_id").get<size_t>();
+        ensure(id > 0 && id <= bundle.filament_presets.size(), "invalid_scope", "Choose an existing 1-based project filament ID");
+        const auto& name = params.at("name").get_ref<const std::string&>();
+        const auto* preset = bundle.filaments.find_preset(name, false);
+        ensure(preset && preset->name == name && preset->is_visible && preset->is_compatible,
+            "incompatible_preset", "Choose an existing visible preset compatible with the current machine/process");
+        const auto& edited = bundle.filaments.get_edited_preset();
+        ensure(!edited.is_dirty, "preset_change_required", "Save or resolve the edited filament preset before changing a project filament");
+        ensure(!ctx.plater.background_process().running(), "busy", "Wait for slicing to complete");
+        const auto index = id - 1;
+        const auto previous = bundle.filament_presets[index];
+        if (previous != name) {
+            const bool was_support = GUI::is_support_filament(index);
+            if (bundle.filament_presets.size() == 1) {
+                auto* tab = GUI::wxGetApp().get_tab(Preset::TYPE_FILAMENT);
+                ensure(tab && tab->select_preset(name), "cancelled", "Filament preset selection was cancelled");
+            }
+            bundle.set_filament_preset(index, name);
+            ctx.plater.update_project_dirty_from_presets();
+            bundle.export_selections(*GUI::wxGetApp().app_config);
+            ctx.plater.sidebar().update_dynamic_filament_list();
+            ctx.plater.on_filament_change(index);
+            ctx.plater.on_config_change(bundle.full_config());
+            if (was_support != GUI::is_support_filament(index) && GUI::wxGetApp().app_config->get("auto_calculate_flush") == "all")
+                ctx.plater.sidebar().auto_calc_flushing_volumes(index);
+            for (auto* plate : ctx.plater.get_partplate_list().get_plate_list())
+                plate->update_slice_result_valid_state(false);
+        }
+        ensure(bundle.filament_presets[index] == name, "selection_failed", "Project filament preset was not assigned");
+        return {{"filament_id", id}, {"previous", previous}, {"preset", preset_info(*preset)},
+            {"changed", previous != name}, {"reslice_required", previous != name}};
+    }
     const auto type = preset_type(params);
     auto& presets = collection(type);
     auto* tab = GUI::wxGetApp().get_tab(type);
@@ -871,6 +939,9 @@ CommandSpecs settings_commands()
     specs["presets.select"] = command_spec(true, {{"preset_type", preset["preset_type"]}, {"name", text()}}, {"preset_type", "name"});
     specs["presets.save_as"] = command_spec(true, {{"preset_type", preset["preset_type"]}, {"name", text()}}, {"preset_type", "name"});
     specs["presets.patch"] = command_spec(true, {{"preset_type", preset["preset_type"]}, {"values", patch["values"]}}, {"preset_type", "values"});
+    specs["presets.filament_matches"] = command_spec(false, {{"ams_filament_id", text()}});
+    specs["presets.assign_filament"] = command_spec(true, {{"filament_id", {{"type", "integer"}, {"minimum", 1}, {"maximum", 256}}}, {"name", text()}}, {"filament_id", "name"});
+    specs["presets.create_filament"] = command_spec(true, {{"vendor", text()}, {"serial", text()}, {"template_name", text()}}, {"vendor", "serial", "template_name"});
     Json paint {{"object_id", text()}, {"volume_id", text()}, {"plate_index", bounded_integer(1000000)}, {"plate_id", text()},
         {"kind", {{"type", "string"}, {"enum", {"support", "seam", "material"}}}}};
     Json inspect = paint; inspect["offset"] = bounded_integer(10000000);

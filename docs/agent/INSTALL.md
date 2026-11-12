@@ -50,7 +50,7 @@ To install a separately downloaded wheel:
 
 ```sh
 ./scripts/agent/install.sh install \
-  --wheel /absolute/path/orca_slicer_mcp-0.5.0-py3-none-any.whl \
+  --wheel /absolute/path/orca_slicer_mcp-0.6.0-py3-none-any.whl \
   --client codex --client zcode
 ```
 

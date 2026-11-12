@@ -6,6 +6,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/log/trivial.hpp>
 #include <string>
+#include <stdexcept>
 #include <cctype>
 #include "libslic3r/LocalesUtils.hpp"
 #include <cstddef>
@@ -612,6 +613,68 @@ static std::string get_filament_id(std::string vendor_typr_serial, const PresetB
     }
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " filament name is: " << vendor_typr_serial << "and create filament_id is: " << user_filament_id;
     return user_filament_id;
+}
+
+CreatedFilament create_agent_filament(const std::string &vendor, const std::string &serial, const std::string &template_name)
+{
+    auto *bundle = wxGetApp().preset_bundle;
+    if (!bundle || !wxGetApp().app_config)
+        throw std::runtime_error("Preset bundle is unavailable");
+    auto &filaments = bundle->filaments;
+    if (filaments.current_is_dirty())
+        throw std::runtime_error("Save or discard the edited filament preset before creating a new filament");
+    auto valid_part = [](const std::string &value) {
+        return !value.empty() && value.size() <= 60 && boost::trim_copy(value) == value &&
+            remove_special_key(value) == value && value.find_first_of("/\\:*?\"<>|") == std::string::npos &&
+            !std::any_of(value.begin(), value.end(), [](unsigned char c) { return c < 32; });
+    };
+    if (!valid_part(vendor) || !valid_part(serial) || vendor == "Bambu" || vendor == "Generic" || str_is_all_digit(vendor))
+        throw std::runtime_error("Use a valid custom vendor and filament serial");
+    const Preset *source = filaments.find_preset(template_name, false);
+    if (!source || !source->is_visible || !source->is_compatible || source->is_external || source->is_project_embedded)
+        throw std::runtime_error("Choose an existing visible saved filament template compatible with the current printer");
+    const auto *type = source->config.option<ConfigOptionStrings>("filament_type");
+    if (!type || type->values.size() != 1 || type->values.front().empty())
+        throw std::runtime_error("The template does not identify a single filament type");
+    const std::string printer = bundle->printers.get_selected_preset().name;
+    const std::string public_name = vendor + " " + (type->values.front() == "PLA-AERO" ? "PLA Aero" : type->values.front()) + " " + serial;
+    const std::string name = public_name + " @" + printer;
+    if (name.size() > 120 || filaments.is_alias_exist(public_name) || filaments.find_preset(name, false))
+        throw std::runtime_error("The filament name already exists or is too long");
+
+    PresetBundle id_sources;
+    load_filament_id_sources(id_sources);
+    const std::string id = get_filament_id(public_name, id_sources);
+    if (id.empty() || id == "null")
+        throw std::runtime_error("Could not create a filament identifier");
+    // Refuse to reuse an existing identifier: this operation creates a distinct filament.
+    for (const auto &preset : id_sources.filaments.get_presets())
+        if (preset.filament_id == id) throw std::runtime_error("Filament identifier is already in use");
+    for (const auto &preset : filaments.get_presets())
+        if (preset.filament_id == id) throw std::runtime_error("Filament identifier is already in use");
+
+    Preset prepared = *source;
+    prepared.filament_id = id;
+    prepared.base_id.clear();
+    // A user template may already belong to an unrelated cloud profile.
+    // The independent filament must enter the native create path instead.
+    prepared.setting_id.clear();
+    prepared.sync_info.clear();
+    prepared.user_id.clear();
+    prepared.updated_time = 0;
+    prepared.config.set_key_value("filament_vendor", new ConfigOptionStrings({vendor}));
+    prepared.config.set_key_value("filament_type", new ConfigOptionStrings({type->values.front()}));
+    prepared.config.set_key_value("compatible_printers", new ConfigOptionStrings({printer}));
+    const std::string previous = filaments.get_selected_preset().name;
+    // Create-only performs an exclusive disk write and reports persistence errors;
+    // never use the wizard's overwrite option for an agent request.
+    filaments.save_current_preset(name, true, false, &prepared, true);
+    filaments.select_preset_by_name(previous, true);
+    bundle->update_compatible(PresetSelectCompatibleType::Never);
+    const auto *created = filaments.find_preset(name, false);
+    if (!created || created->filament_id != id)
+        throw std::runtime_error("Created filament could not be verified");
+    return {name, id, printer};
 }
 
 static json get_config_json(const Preset* preset) {

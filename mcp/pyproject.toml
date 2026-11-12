@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "orca-slicer-mcp"
-version = "0.5.0"
+version = "0.6.0"
 description = "Local MCP adapter for explicitly enabled OrcaSlicer windows"
 readme = "README.md"
 requires-python = ">=3.11"

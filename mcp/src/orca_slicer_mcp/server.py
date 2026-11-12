@@ -374,10 +374,12 @@ def create_server(directory: Path, recipes_db: Path | None = None) -> FastMCP:
         return await domain_call(target, action, parameters, request_id, ctx, wait_seconds)
 
     @server.tool(annotations=mutate)
-    async def orca_presets(target: Target, action: Literal['presets.list', 'presets.describe', 'presets.select', 'presets.patch', 'presets.save_as'],
+    async def orca_presets(target: Target, action: Literal['presets.list', 'presets.describe', 'presets.select', 'presets.patch', 'presets.save_as', 'presets.filament_matches', 'presets.assign_filament', 'presets.create_filament'],
             parameters: dict[str, Any], request_id: RequestId, ctx: Context,
             wait_seconds: WaitSeconds = 1) -> CallToolResult:
         """Inspect/select/edit native process, filament and machine presets. save_as creates a new user preset without overwrite.
+
+        filament_matches compares a fresh reported AMS filament ID to compatible presets and lists project slots; it does not contact or verify AMS or a downstream queue. assign_filament sets a specified 1-based project filament slot and requires a fresh slice after a change. create_filament creates a distinct saved filament from a compatible template; it does not verify cloud synchronization.
 
         Read method_params_schemas from orca_get_capabilities for exact parameters.
         Mutations require state_token inside parameters. The native build validates all fields.

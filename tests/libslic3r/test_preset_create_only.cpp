@@ -104,3 +104,22 @@ TEST_CASE("Create-only save registers a newly persisted preset once", "[PresetCr
     REQUIRE_THROWS_AS(presets.save_current_preset("New preset", false, false, nullptr, true), std::runtime_error);
     CHECK(presets.get_presets().size() == count + 1);
 }
+
+TEST_CASE("Create-only independent filament persists its identity and exposes its alias", "[PresetCreateOnly][Regression]")
+{
+    PresetDataDirectory data;
+    Slic3r::PresetCollection filaments(Slic3r::Preset::TYPE_FILAMENT, Slic3r::Preset::filament_options(),
+                                    static_cast<const Slic3r::PrintRegionConfig&>(Slic3r::FullPrintConfig::defaults()));
+    filaments.update_user_presets_directory(data.temporary.string(), "filament");
+    Slic3r::Preset prepared = filaments.get_selected_preset();
+    prepared.filament_id = "Pabcdef0";
+    prepared.config.set_key_value("compatible_printers", new Slic3r::ConfigOptionStrings({"Test printer"}));
+    REQUIRE_NOTHROW(filaments.save_current_preset("Example PETG Black @Test printer", true, false, &prepared, true));
+    auto *saved = filaments.find_preset("Example PETG Black @Test printer", false);
+    REQUIRE(saved != nullptr);
+    CHECK(saved->filament_id == "Pabcdef0");
+    CHECK(saved->inherits().empty());
+    CHECK(saved->alias == "Example PETG Black");
+    CHECK(filaments.is_alias_exist("Example PETG Black"));
+    CHECK(read_bytes(saved->file).find("Pabcdef0") != std::string::npos);
+}

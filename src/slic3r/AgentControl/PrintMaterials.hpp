@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Domain.hpp"
+#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <map>
@@ -9,6 +10,23 @@
 #include <vector>
 
 namespace Slic3r::AgentControl {
+
+// A missing, malformed, or fully transparent color is not evidence of a
+// match. Compare RGB only; Orca and device telemetry use optional alpha bytes.
+inline std::string color_comparison(const std::string& project, const std::string& slot)
+{
+    auto rgb = [](const std::string& raw) -> std::string {
+        const std::string s = !raw.empty() && raw.front() == '#' ? raw.substr(1) : raw;
+        if (s.size() != 6 && s.size() != 8) return {};
+        for (const unsigned char c : s) if (!std::isxdigit(c)) return {};
+        if (s.size() == 8 && s.substr(6) == "00") return {};
+        std::string result = s.substr(0, 6);
+        for (char& c : result) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        return result;
+    };
+    const auto a = rgb(project), b = rgb(slot);
+    return a.empty() || b.empty() ? "unknown" : a == b ? "match" : "mismatch";
+}
 
 // GCodeProcessor's historical *_per_extruder names contain zero-based project
 // filament IDs, including support, painted regions and wipe-tower consumption.

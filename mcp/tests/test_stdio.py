@@ -13,6 +13,7 @@ import uuid
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from orca_slicer_mcp.client import READ_METHODS
 
 
 class NativeFixture:
@@ -92,6 +93,8 @@ class NativeFixture:
                     elif method == "printing.status":
                         status["result"] = {"operation_id": params["operation_id"],
                             "journal": {"intent": {"fixture": True}, "outcome": {"state": "outcome_unknown", "native_code": -1}}}
+                    elif method in ("presets.assign_filament", "presets.create_filament") and params.get("state_token") != fixture.state_token:
+                        status.update(state="failed", error={"kind": "conflict", "message": "Fresh state token required"})
                     else:
                         status["result"] = {"method": method, "parameters": {k: v for k, v in params.items() if k != "target"}}
                     fixture.jobs[job_id] = status
@@ -119,6 +122,9 @@ class NativeFixture:
 
 class StdioIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_official_client_two_windows_mutation_retry_conflict_and_cancellation(self):
+        self.assertIn("presets.filament_matches", READ_METHODS)
+        self.assertNotIn("presets.assign_filament", READ_METHODS)
+        self.assertNotIn("presets.create_filament", READ_METHODS)
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder)
             a, b = NativeFixture(directory, "A"), NativeFixture(directory, "B")
@@ -155,6 +161,18 @@ class StdioIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         listed = await call("orca_list_instances")
                         self.assertEqual({row["project"] for row in listed["instances"]}, {"A", "B"})
                         await call("orca_get_capabilities", {"target": a.target})
+                        mapping = await call("orca_presets", {"target": b.target, "action": "presets.filament_matches",
+                            "parameters": {"ams_filament_id": "P1234567"}, "request_id": "filament-read"})
+                        self.assertEqual(mapping["result"]["method"], "presets.filament_matches")
+                        self.assertNotIn("state_token", mapping["result"]["parameters"])
+                        for action, values in (("presets.assign_filament", {"filament_id": 2, "name": "Fixture PLA"}),
+                                               ("presets.create_filament", {"vendor": "Fixture", "serial": "Test", "template_name": "PLA"})):
+                            args = {"target": b.target, "action": action, "parameters": values, "request_id": action + "-denied"}
+                            await call("orca_presets", args, error=True)
+                            sent = await call("orca_presets", {**args, "parameters": {**values, "state_token": b.state_token},
+                                "request_id": action + "-allowed"})
+                            self.assertEqual(sent["result"]["method"], action)
+                            self.assertEqual(sent["result"]["parameters"]["state_token"], b.state_token)
                         await call("orca_get_settings_schema", {"target": a.target})
                         scene = await call("orca_get_scene", {"target": a.target})
                         layers = await call("orca_list_layers", {"target": a.target, "plate_id": "plate:1:2"})

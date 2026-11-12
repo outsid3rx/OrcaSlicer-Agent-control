@@ -195,9 +195,18 @@ Validation validate_bbl_strict(MachineObject& device,const DynamicPrintConfig& c
         if(const auto* preset=presets->filaments.find_preset(presets->filament_presets[index]))filament_id=preset->filament_id;
         if(colors&&index<colors->values.size())source_color=colors->values[index];
         if(source_color.size()==7)source_color+="FF";
+        const auto color_status=color_comparison(source_color,tray->color);
+        if(color_status!="match") {
+            const auto label=std::string("Project filament ")+std::to_string(index+1)+" ("+presets->filament_presets[index]+") mapped to "+
+                (use_ams?std::string("AMS tray ")+std::to_string(tray_index):std::string("external spool"));
+            const auto detail=label+": project color "+(source_color.empty()?"unknown":source_color)+", reported slot color "+(tray->color.empty()?"unknown":tray->color)+".";
+            validation.warnings.push_back(warning(color_status=="mismatch"?"filament_color_mismatch":"filament_color_unverified",
+                detail+(color_status=="mismatch"?" Colors differ; explicitly confirm an intentional substitution before submission.":" Color matching cannot be verified; check the material before submission.")));
+        }
         materials.push_back({{"filament_id",index+1},{"material_type",type},{"material_id",tray->setting_id},
             {"filament_preset",presets->filament_presets[index]},{"tray_index",tray_index},{"ams_id",ams_id},{"slot_id",slot_id},
-            {"material_tag",tray->tag_uid},{"material_color",tray->color},{"source_color",source_color}});
+            {"material_tag",tray->tag_uid},{"material_color",tray->color},{"source_color",source_color},
+            {"color_match",color_status},{"mapping_effect",action=="upload_only"?"not_sent_with_upload":"sent_with_start"}});
         // Native single-extruder mode clears the plate filament map and omits
         // nozzleId. A restored map must not label the sole nozzle as left/right.
         native_materials.push_back({index,tray_index,ams_id,slot_id,-1,type,filament_id,source_color,tray->color});

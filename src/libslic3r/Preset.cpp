@@ -3482,7 +3482,8 @@ void PresetCollection::save_current_preset(const std::string &new_name, bool det
             if (parent) { Preset::normalize_inherits(prepared.config, parent); if (prepared.base_id.empty()) prepared.base_id = parent->setting_id; }
             if (!prepared.save(parent ? &parent->config : nullptr, true)) throw std::runtime_error("Cannot create the new preset file without replacing an existing path");
         }
-        m_presets.insert(find_preset_internal(new_name), std::move(prepared));
+        auto inserted = m_presets.insert(find_preset_internal(new_name), std::move(prepared));
+        set_custom_preset_alias(*inserted);
         select_preset_by_name(new_name, true);
         LifecycleEventContext context; context.name = new_name; context.msg = "new"; context.code = LifecycleEvtCode::Ok;
         fire_lifecycle_event(LifecycleEvent::PresetSaved, context);

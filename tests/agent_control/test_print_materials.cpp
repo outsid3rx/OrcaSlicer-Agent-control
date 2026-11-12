@@ -7,6 +7,17 @@
 
 using namespace Slic3r::AgentControl;
 
+TEST_CASE("Color comparison distinguishes matches mismatches and unknown colors", "[PrintMaterials]")
+{
+    CHECK(color_comparison("#aAbBcC", "AABBCCFF") == "match");
+    CHECK(color_comparison("#000000", "00BFFFFF") == "mismatch");
+    CHECK(color_comparison("#000000", "000000FF") == "match");
+    CHECK(color_comparison("#000000", "00000000") == "unknown");
+    CHECK(color_comparison("", "FFFFFFFF") == "unknown");
+    CHECK(color_comparison("#GG0000", "000000FF") == "unknown");
+    CHECK(color_comparison("#FFFFFF", "") == "unknown");
+}
+
 TEST_CASE("Slice consumption preserves sparse project filament IDs", "[PrintMaterials]")
 {
     // The processor aggregates model/painting, supports and tower into this map.

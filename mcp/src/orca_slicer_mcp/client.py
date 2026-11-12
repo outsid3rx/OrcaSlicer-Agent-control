@@ -17,7 +17,7 @@ from .permissions import private_file
 
 READ_METHODS = frozenset({"system.describe", "scene.describe", "settings.describe", "settings.get",
     "slicing.result", "jobs.get", "geometry.validate", "painting.describe", "painting.raycast", "history.describe",
-    "preview.render", "presets.list", "presets.describe", "printers.list", "printers.describe",
+    "preview.render", "presets.list", "presets.describe", "presets.filament_matches", "printers.list", "printers.describe",
     "printers.status", "printers.filaments", "printing.status", "printing.reconcile"})
 
 

@@ -90,7 +90,7 @@ Expanded tools group fixed allowlists of native actions:
 | `orca_arrange` | Native arrangement of explicit instances |
 | `orca_geometry` | Validate, cut/connectors, boolean, simplify, repair |
 | `orca_painting` | Support/seam/material facets, regions, raycast and brush |
-| `orca_presets` | List/describe/select/patch/save as new user preset |
+| `orca_presets` | List/describe/select/patch/save presets; inspect filament ID matches, assign a project slot, or create a distinct user filament |
 | `orca_preview` | Native PNG as MCP image content |
 | `orca_history` | Native history inspection, Undo/Redo |
 | `orca_slice_plates` | Explicit plate set with sequential child jobs |

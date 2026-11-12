@@ -189,6 +189,12 @@ indices must identify existing 1-based filament slots, or zero for inheritance.
 collections. Selection retains native Transfer/Discard/Save decisions and checks
 visibility/compatibility. Patch edits the managed copy, not its disk JSON, and
 keeps vector cardinalities. Filament patch currently requires one filament slot.
+Filament preset metadata includes the native filament and setting IDs. `presets.filament_matches`
+compares an explicitly supplied AMS ID against visible compatible presets and reports
+project assignments, including ambiguity; callers must obtain fresh device telemetry.
+`presets.assign_filament` changes one 1-based project filament slot, refuses dirty edits,
+and invalidates slices. `presets.create_filament` creates a distinct native user filament
+from a saved compatible template; cloud delivery and physical spool identity remain unverified.
 Save-as validates a simple new name and uses native create-only persistence:
 serialize first, atomically publish without replacement, then register/select the
 new preset. Existing registry names, filesystem aliases and sidecar collisions
@@ -445,6 +451,9 @@ including supports, painting and tower consumption, rather than the configured
 project material count. Each used material is verified against nozzle hardness,
 loaded material type and native compatibility rules. An explicit `ams_mapping`
 contains one entry per used 1-based project filament ID and its native tray index.
+Each mapping reports color as match, mismatch or unknown. Mismatch and unknown produce
+acknowledgement warnings; upload-only explicitly reports that mapping is not transmitted
+with a start command. This does not establish downstream queue selection.
 `ams_tray_index` remains valid for exactly one used material. Payload arrays keep
 unused project positions, preserving sparse tool IDs in the artifact. Single-nozzle
 AMS multicolor is supported; dual/rack starts and manual multicolor spool changes

@@ -30,6 +30,16 @@
 namespace Slic3r {
 namespace GUI {
 
+struct CreatedFilament {
+    std::string name;
+    std::string filament_id;
+    std::string printer;
+};
+
+// Create one independent user filament with the same ID rules as the wizard.
+// Uses a saved, compatible template and refuses to replace existing presets.
+CreatedFilament create_agent_filament(const std::string &vendor, const std::string &serial, const std::string &template_name);
+
 class CreateFilamentPresetDialog : public DPIDialog
 {
 public:
